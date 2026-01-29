@@ -93,8 +93,7 @@
       // allow keyboard activation
       btn.addEventListener('keydown', (e)=>{if(e.key==='Enter' || e.key===' '){e.preventDefault(); celebrate()}});
 
-      // Also make it auto-run once after first load for a gentle welcome (but only once)
-      let ran=false; window.addEventListener('load', ()=>{if(!ran){setTimeout(()=>{celebrate(W/2,H/2); ran=true},850)} })
+      // Note: autoplay removed — effects only run on user interaction (button click or keyboard)
     </script>
   </body>
 </html>
