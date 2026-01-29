@@ -7,8 +7,8 @@
     <style>
       :root{--bg:#ffc0d9;--card:#fff;--text:#111}
       html,body{height:100%;margin:0}
-      body{background:var(--bg);display:flex;align-items:center;justify-content:center;font-family:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial;color:var(--text)}
-      .wrap{position:relative;width:min(880px,94vw);max-width:920px}
+      body{background:var(--bg);display:flex;align-items:center;justify-content:center;font-family:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial;color:var(--text);overflow:hidden}
+      .wrap{position:relative;width:min(880px,94vw);max-width:920px;z-index:10}
       .card{background:var(--card);border-radius:16px;padding:2.25rem;box-shadow:0 10px 30px rgba(15,23,42,0.08);text-align:center}
       h1{margin:0 0 .5rem;font-size:clamp(1.5rem,3vw,2rem)}
       p{margin:.5rem 0 1.25rem;color:#374151}
@@ -17,16 +17,15 @@
       /* canvas sits over content */
       canvas#fx{position:fixed;left:0;top:0;pointer-events:none;width:100%;height:100%;z-index:30}
       /* big scrolling message */
-      .love{position:fixed;left:50%;transform:translateX(-50%);bottom:-30vh;z-index:40;font-style:italic;font-weight:700;color:#6b0446;text-shadow:0 6px 20px rgba(107,4,70,0.15);font-size:12vw;white-space:nowrap;pointer-events:none}
+      .love{position:fixed;left:50%;transform:translateX(-50%);bottom:-30vh;z-index:40;font-style:italic;font-weight:800;color:#fff;text-shadow:0 6px 30px rgba(0,0,0,0.6);font-size:12vw;white-space:nowrap;pointer-events:none}
       .love.show{animation:scrollUp 6s linear forwards}
       @keyframes scrollUp{0%{bottom:-30vh;opacity:0}10%{opacity:1}60%{bottom:45vh;opacity:1}100%{bottom:60vh;opacity:0}}
-      /* small center confetti burst helper */
       .hint{font-size:.85rem;color:#9b2b5a;margin-top:1rem}
       @media (max-width:520px){.love{font-size:18vw}}
     </style>
   </head>
   <body>
-    <div class="wrap">
+    <div class="wrap" id="mainWrap">
       <div class="card" role="main">
         <h1>Hello, Esther!</h1>
         <p>Click the button below — a little surprise awaits.</p>
@@ -36,10 +35,10 @@
     </div>
 
     <canvas id="fx" aria-hidden="true"></canvas>
-    <div id="love" class="love" aria-hidden="true">I Love You</div>
+    <div id="love" class="love" aria-hidden="true">I LOVE YOU</div>
 
     <script>
-      // Lightweight confetti + fireworks implementation
+      // Particle system: confetti, fireworks, hearts
       const canvas = document.getElementById('fx');
       const ctx = canvas.getContext('2d');
       let W = canvas.width = innerWidth;
@@ -47,53 +46,84 @@
       window.addEventListener('resize', ()=>{W=canvas.width=innerWidth;H=canvas.height=innerHeight});
 
       function rand(min,max){return Math.random()*(max-min)+min}
-      // Particles
+
       class Particle{
-        constructor(x,y,dx,dy,color,size,ttl,type){this.x=x;this.y=y;this.vx=dx;this.vy=dy;this.color=color;this.size=size;this.ttl=ttl;this.age=0;this.type=type}
-        step(dt){this.age+=dt;this.x+=this.vx*dt;this.y+=this.vy*dt; if(this.type==='confetti'){this.vy+=200*dt; this.vx*=0.995} else {this.vy+=120*dt; this.vx*=0.99}}
-        draw(){ctx.save();ctx.globalAlpha=Math.max(0,1 - this.age/this.ttl);ctx.fillStyle=this.color;if(this.type==='confetti'){ctx.fillRect(this.x,this.y,this.size,this.size/3)} else {ctx.beginPath();ctx.arc(this.x,this.y,this.size,0,Math.PI*2);ctx.fill()}ctx.restore()}
+        constructor(x,y,dx,dy,color,size,ttl,type){
+          this.x=x;this.y=y;this.vx=dx;this.vy=dy;this.color=color;this.size=size;this.ttl=ttl;this.age=0;this.type=type;this.rot=rand(0,Math.PI*2);
+        }
+        step(dt){
+          this.age+=dt;
+          this.x+=this.vx*dt; this.y+=this.vy*dt;
+          if(this.type==='confetti'){ this.vy+=200*dt; this.vx*=0.995; this.rot += dt*10 }
+          else if(this.type==='spark'){ this.vy+=120*dt; this.vx*=0.99 }
+          else if(this.type==='heart'){ this.vy -= 40*dt; this.vx *= 0.995; this.rot += dt*2 }
+        }
+        draw(){
+          ctx.save(); ctx.globalAlpha = Math.max(0,1 - this.age/this.ttl);
+          if(this.type==='confetti'){
+            ctx.translate(this.x,this.y); ctx.rotate(this.rot); ctx.fillStyle=this.color; ctx.fillRect(-this.size/2,-this.size/6,this.size,this.size/3);
+          } else if(this.type==='spark'){
+            ctx.fillStyle=this.color; ctx.beginPath(); ctx.arc(this.x,this.y,this.size,0,Math.PI*2); ctx.fill();
+          } else if(this.type==='heart'){
+            ctx.fillStyle=this.color; ctx.font = `${this.size*2}px serif`; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText('❤', this.x, this.y);
+          }
+          ctx.restore();
+        }
       }
 
       let parts=[]; let last=performance.now();
-      function loop(t){const dt=Math.min(0.06,(t-last)/1000);last=t;ctx.clearRect(0,0,W,H);
-        for(let i=parts.length-1;i>=0;i--){const p=parts[i];p.step(dt);p.draw(); if(p.age>p.ttl)parts.splice(i,1)}
-        requestAnimationFrame(loop)}
+      function loop(t){
+        const dt = Math.min(0.06,(t-last)/1000); last=t; ctx.clearRect(0,0,W,H);
+        for(let i=parts.length-1;i>=0;i--){ const p = parts[i]; p.step(dt); p.draw(); if(p.age>p.ttl) parts.splice(i,1); }
+        requestAnimationFrame(loop);
+      }
       requestAnimationFrame(loop);
 
-      // burst confetti at location
-      function burst(x,y,count=60){const colors=['#ff4da6','#ff8fc2','#fff3f7','#ffd1e6','#ff66a3','#ffb3d9','#ff87c9'];
-        for(let i=0;i<count;i++){const ang=rand(0,Math.PI*2);const sp=rand(200,700);const dx=Math.cos(ang)*sp;const dy=Math.sin(ang)*sp;const c=colors[Math.floor(Math.random()*colors.length)];parts.push(new Particle(x,y,dx,dy,c,rand(6,12),rand(1,2.2),'confetti'))}
+      function burst(x,y,count=60){
+        const colors=['#ff4da6','#ff8fc2','#fff3f7','#ffd1e6','#ff66a3','#ffb3d9','#ff87c9'];
+        for(let i=0;i<count;i++){ const ang=rand(0,Math.PI*2); const sp=rand(200,700); const dx=Math.cos(ang)*sp; const dy=Math.sin(ang)*sp; const c=colors[Math.floor(Math.random()*colors.length)]; parts.push(new Particle(x,y,dx,dy,c,rand(6,12),rand(1,2.2),'confetti')) }
       }
 
-      // fireworks: create explosive particles from a shell
-      function firework(x,y){const hue = Math.floor(rand(0,360)); const baseColor = `hsl(${hue} 90% 60%)`; const shellCount= rand(20,40)|0;
+      function firework(x,y){
+        const hue = Math.floor(rand(0,360)); const baseColor = `hsl(${hue} 90% 60%)`; const shellCount = rand(20,40)|0;
         // shell ascent flash
-        for(let i=0;i<8;i++){parts.push(new Particle(x,y+rand(0,30),rand(-80,80),-rand(300,520),baseColor,rand(1,3),0.7,'spark'))}
-        setTimeout(()=>{
-          for(let i=0;i<shellCount;i++){const ang=rand(0,Math.PI*2);const sp=rand(120,520);const c=`hsl(${hue+rand(-40,40)} 95% ${rand(45,65)}%)`; parts.push(new Particle(x,y,Math.cos(ang)*sp,Math.sin(ang)*sp,c,rand(2,5),rand(1.0,1.8),'spark'))}
-        },120)
+        for(let i=0;i<8;i++){ parts.push(new Particle(x,y+rand(0,30),rand(-80,80),-rand(300,520),baseColor,rand(1,3),0.7,'spark')) }
+        setTimeout(()=>{ for(let i=0;i<shellCount;i++){ const ang=rand(0,Math.PI*2); const sp=rand(120,520); const c=`hsl(${hue+rand(-40,40)} 95% ${rand(45,65)}%)`; parts.push(new Particle(x,y,Math.cos(ang)*sp,Math.sin(ang)*sp,c,rand(2,5),rand(1.0,1.8),'spark')) } },120);
       }
 
-      // Trigger both effects and show scrolling text
+      function spawnHeart(x,y){ const colors=['#ffe6f0','#ffc0d9','#ff8fc2','#ff4da6']; const c=colors[Math.floor(rand(0,colors.length))]; parts.push(new Particle(x + rand(-60,60), y + rand(-20,20), rand(-20,20), -rand(20,80), c, rand(10,18), rand(3.5,6),'heart')) }
+
       const btn = document.getElementById('partyBtn');
       const love = document.getElementById('love');
-      function celebrate(clientX,clientY){ // coords optional
+      const mainWrap = document.getElementById('mainWrap');
+
+      let celebrating=false;
+      function celebrate(clientX,clientY){
+        if(celebrating) return; celebrating=true;
+        // hide other page content to make the screen blank (except canvas + love)
+        mainWrap.style.display='none';
+        // optionally darken background for contrast
+        document.body.style.background='#000';
+
         const x = clientX || W/2; const y = clientY || H/2;
-        burst(x,y,80);
-        // launch random fireworks across the top
-        const fwCount = 5; for(let i=0;i<fwCount;i++){setTimeout(()=>{firework(rand(60,W-60),rand(H*0.15,H*0.45))}, i*250)}
+        burst(x,y,100);
+        const fwCount = 6; for(let i=0;i<fwCount;i++){ setTimeout(()=>{ firework(rand(60,W-60), rand(H*0.15,H*0.45)) }, i*220) }
+
+        // hearts: spawn periodically for a short duration, independent from fireworks/confetti
+        const heartInterval = setInterval(()=>{ spawnHeart(rand(60,W-60), H - 80) }, 180);
+        setTimeout(()=>{ clearInterval(heartInterval) }, 4800);
+
         // show the scrolling message
-        love.classList.remove('show'); // restart
-        void love.offsetWidth; // reflow
-        love.classList.add('show');
+        love.classList.remove('show'); void love.offsetWidth; love.classList.add('show');
+
+        // after the animation finishes, restore the page (so user can trigger again)
+        setTimeout(()=>{ mainWrap.style.display='block'; document.body.style.background='var(--bg)'; celebrating=false; }, 7000);
       }
 
-      btn.addEventListener('click', (e)=>{const rect=btn.getBoundingClientRect(); const x=rect.left+rect.width/2; const y=rect.top; celebrate(x,y)});
+      btn.addEventListener('click', (e)=>{ const rect=btn.getBoundingClientRect(); const x=rect.left+rect.width/2; const y=rect.top; celebrate(x,y); });
+      btn.addEventListener('keydown', (e)=>{ if(e.key==='Enter' || e.key===' '){ e.preventDefault(); celebrate(); } });
 
-      // allow keyboard activation
-      btn.addEventListener('keydown', (e)=>{if(e.key==='Enter' || e.key===' '){e.preventDefault(); celebrate()}});
-
-      // Note: autoplay removed — effects only run on user interaction (button click or keyboard)
+      // No autoplay; effects only on explicit user interaction
     </script>
   </body>
 </html>
